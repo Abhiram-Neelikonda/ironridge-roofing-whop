@@ -10,26 +10,138 @@ export const Route = createFileRoute("/admin")({ component: Admin });
 
 type Tab = "invoices" | "leads" | "pixels";
 
-function Admin() {
-  const [token, setToken] = useState("");
-  const [tab, setTab] = useState<Tab>("invoices");
+/* ------------------------- Whop OAuth (PKCE) ------------------------- */
 
-  // Remember the admin token on this device so it's not retyped every visit.
+const APP_ID = site.brand.appId;
+const OAUTH_SCOPE = "openid profile email";
+
+function base64url(bytes: Uint8Array): string {
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function randomString(len = 48): string {
+  const bytes = new Uint8Array(len);
+  crypto.getRandomValues(bytes);
+  return base64url(bytes);
+}
+async function pkceChallenge(verifier: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  return base64url(new Uint8Array(digest));
+}
+function redirectUri(): string {
+  return `${window.location.origin}/admin`;
+}
+async function startWhopSignIn() {
+  const verifier = randomString();
+  const state = randomString(16);
+  sessionStorage.setItem("ir_pkce", verifier);
+  sessionStorage.setItem("ir_state", state);
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: APP_ID,
+    redirect_uri: redirectUri(),
+    scope: OAUTH_SCOPE,
+    state,
+    nonce: randomString(16), // required by Whop for the openid scope
+    code_challenge: await pkceChallenge(verifier),
+    code_challenge_method: "S256",
+  });
+  window.location.href = `https://api.whop.com/oauth/authorize?${params.toString()}`;
+}
+
+function Admin() {
+  const [tab, setTab] = useState<Tab>("invoices");
+  const [auth, setAuth] = useState(""); // session token used as x-admin-token for API calls
+  const [userName, setUserName] = useState("");
+  const [status, setStatus] = useState<"checking" | "out" | "signingin" | "in" | "error">("checking");
+  const [error, setError] = useState("");
+
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("ir_admin_token");
-      if (saved) setToken(saved);
-    } catch {
-      /* ignore */
-    }
+    (async () => {
+      try {
+        const url = new URLSearchParams(window.location.search);
+        const code = url.get("code");
+        const state = url.get("state");
+        if (code && state) {
+          setStatus("signingin");
+          const verifier = sessionStorage.getItem("ir_pkce") ?? "";
+          const savedState = sessionStorage.getItem("ir_state") ?? "";
+          window.history.replaceState(null, "", "/admin");
+          if (!verifier || state !== savedState) {
+            setError("Sign-in could not be verified. Please try again.");
+            setStatus("error");
+            return;
+          }
+          const tokRes = await fetch("https://api.whop.com/oauth/token", {
+            method: "POST",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              grant_type: "authorization_code",
+              code,
+              redirect_uri: redirectUri(),
+              client_id: APP_ID,
+              code_verifier: verifier,
+            }),
+          });
+          if (!tokRes.ok) {
+            setError("Could not complete Whop sign-in (token exchange).");
+            setStatus("error");
+            return;
+          }
+          const { access_token } = (await tokRes.json()) as { access_token?: string };
+          const loginRes = await fetch("/api/admin-login", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ access_token }),
+          });
+          const body = (await loginRes.json()) as { session?: string; name?: string; error?: string; sub?: string };
+          if (!loginRes.ok || !body.session) {
+            setError(
+              (body.error ?? "This account isn't authorized for the staff console.") +
+                (body.sub ? ` (your Whop id: ${body.sub})` : ""),
+            );
+            setStatus("error");
+            return;
+          }
+          try {
+            localStorage.setItem("ir_admin_session", body.session);
+          } catch {
+            /* ignore */
+          }
+          setAuth(body.session);
+          setUserName(body.name ?? "");
+          setStatus("in");
+          return;
+        }
+        const saved = localStorage.getItem("ir_admin_session");
+        if (saved) {
+          setAuth(saved);
+          setStatus("in");
+          return;
+        }
+        setStatus("out");
+      } catch (e) {
+        setError((e as Error).message);
+        setStatus("error");
+      }
+    })();
   }, []);
-  useEffect(() => {
+
+  function signOut() {
     try {
-      if (token) localStorage.setItem("ir_admin_token", token);
+      localStorage.removeItem("ir_admin_session");
     } catch {
       /* ignore */
     }
-  }, [token]);
+    setAuth("");
+    setUserName("");
+    setStatus("out");
+  }
+
+  if (status !== "in") {
+    return <SignIn status={status} error={error} onToken={(t) => { setAuth(t); setStatus("in"); }} />;
+  }
 
   return (
     <div className="subpage">
@@ -38,8 +150,11 @@ function Admin() {
           <Logo />
           <span className="header__spacer" />
           <span className="chip">
-            <Icon name="lock" /> Staff console
+            <Icon name="lock" /> {userName ? `Signed in — ${userName}` : "Staff console"}
           </span>
+          <button className="btn btn--secondary" style={{ marginLeft: "1rem", minHeight: 38 }} onClick={signOut} type="button">
+            Sign out
+          </button>
         </div>
       </header>
 
@@ -49,11 +164,6 @@ function Admin() {
           <p style={{ color: "var(--color-muted)", marginTop: "0.4rem", marginBottom: "1.2rem" }}>
             Bill final balances, review incoming leads, and check tracking — all powered by the Whop API.
           </p>
-
-          <div className="field" style={{ maxWidth: 360, marginBottom: "1.3rem" }}>
-            <label htmlFor="token">Admin token</label>
-            <input id="token" type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="ADMIN_TOKEN" />
-          </div>
 
           <div className="seg" role="tablist" style={{ marginBottom: "1.5rem" }}>
             <button data-active={tab === "invoices"} onClick={() => setTab("invoices")} type="button">
@@ -67,11 +177,77 @@ function Admin() {
             </button>
           </div>
 
-          {tab === "invoices" && <InvoicesTab token={token} />}
-          {tab === "leads" && <LeadsTab token={token} />}
-          {tab === "pixels" && <PixelsTab token={token} />}
+          {tab === "invoices" && <InvoicesTab token={auth} />}
+          {tab === "leads" && <LeadsTab token={auth} />}
+          {tab === "pixels" && <PixelsTab token={auth} />}
         </div>
       </main>
+    </div>
+  );
+}
+
+function SignIn({
+  status,
+  error,
+  onToken,
+}: {
+  status: string;
+  error: string;
+  onToken: (t: string) => void;
+}) {
+  const [showToken, setShowToken] = useState(false);
+  const [tok, setTok] = useState("");
+  return (
+    <div className="status-page">
+      <div className="status-card">
+        <span className="status-icon status-icon--ok">
+          <Icon name="lock" size={28} />
+        </span>
+        <h1 style={{ fontSize: "1.5rem" }}>{site.brand.shortName} staff console</h1>
+        <p style={{ color: "var(--color-muted)", marginTop: "0.5rem" }}>
+          Sign in with the Whop account that owns this business to manage invoices, leads, and tracking.
+        </p>
+
+        {status === "signingin" && <p style={{ marginTop: "1.2rem" }}>Signing you in…</p>}
+        {status === "error" && (
+          <div className="notice notice--err" style={{ marginTop: "1.2rem" }}>
+            {error}
+          </div>
+        )}
+
+        <button
+          className="btn btn--primary btn--block btn--lg"
+          style={{ marginTop: "1.4rem" }}
+          onClick={() => startWhopSignIn()}
+          disabled={status === "signingin"}
+          type="button"
+        >
+          Sign in with Whop
+        </button>
+
+        <button
+          className="btn"
+          style={{ marginTop: "0.8rem", color: "var(--color-muted)", background: "transparent" }}
+          onClick={() => setShowToken((v) => !v)}
+          type="button"
+        >
+          Use admin token instead
+        </button>
+        {showToken && (
+          <div style={{ marginTop: "0.8rem", display: "flex", gap: "0.5rem" }}>
+            <input
+              type="password"
+              value={tok}
+              onChange={(e) => setTok(e.target.value)}
+              placeholder="ADMIN_TOKEN"
+              style={{ flex: 1 }}
+            />
+            <button className="btn btn--secondary" onClick={() => tok && onToken(tok)} type="button">
+              Enter
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

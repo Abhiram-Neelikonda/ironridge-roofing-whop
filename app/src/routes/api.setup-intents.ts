@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { whopFetch, json, accountId } from "../lib/whop-api";
+import { adminAuthed } from "../lib/auth";
 
 interface SetupIntent {
   id: string;
@@ -17,7 +18,8 @@ interface SetupIntent {
 export const Route = createFileRoute("/api/setup-intents")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        if (!(await adminAuthed(request))) return json({ error: "Unauthorized.", data: [] }, 401);
         const res = await whopFetch<{ data?: SetupIntent[] }>(
           `/setup_intents?company_id=${accountId()}&per=25`,
           { method: "GET" },

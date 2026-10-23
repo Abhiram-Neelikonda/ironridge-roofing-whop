@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { json } from "../lib/whop-api";
+import { adminAuthed } from "../lib/auth";
 import { pixelStats, dbConfigured } from "../lib/db";
 
 /**
@@ -10,10 +11,7 @@ export const Route = createFileRoute("/api/pixel-stats")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const adminToken = process.env.ADMIN_TOKEN;
-        if (adminToken && request.headers.get("x-admin-token") !== adminToken) {
-          return json({ error: "Unauthorized.", counts: [], recent: [] }, 401);
-        }
+        if (!(await adminAuthed(request))) return json({ error: "Unauthorized.", counts: [], recent: [] }, 401);
         if (!dbConfigured()) {
           return json({ counts: [], recent: [], note: "No database configured." }, 200);
         }

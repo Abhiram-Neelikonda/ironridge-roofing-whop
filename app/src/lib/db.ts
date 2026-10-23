@@ -107,6 +107,55 @@ export interface PixelStats {
   recent: { event: string; created_at: string }[];
 }
 
+/* --------------------------- admin sessions --------------------------- */
+
+async function ensureSessionTable() {
+  const sql = client();
+  await sql`CREATE TABLE IF NOT EXISTS admin_sessions (
+    token text PRIMARY KEY,
+    sub text,
+    name text,
+    created_at timestamptz DEFAULT now(),
+    expires_at timestamptz
+  )`;
+}
+
+function randomToken(): string {
+  const a = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}${Math.random()}`;
+  const b = globalThis.crypto?.randomUUID?.() ?? `${Math.random()}`;
+  return `sess_${a}${b}`.replace(/-/g, "");
+}
+
+export async function createSession(sub: string, name: string, days = 30): Promise<string | null> {
+  if (!URL) return null;
+  try {
+    await ensureSessionTable();
+    const sql = client();
+    const token = randomToken();
+    await sql`INSERT INTO admin_sessions (token, sub, name, expires_at)
+      VALUES (${token}, ${sub}, ${name}, now() + ${`${days} days`}::interval)`;
+    return token;
+  } catch (err) {
+    console.error("[db] createSession failed", (err as Error).message);
+    return null;
+  }
+}
+
+export async function verifySession(token: string): Promise<{ sub: string; name: string } | null> {
+  if (!URL || !token) return null;
+  try {
+    await ensureSessionTable();
+    const sql = client();
+    const rows = (await sql`SELECT sub, name FROM admin_sessions WHERE token = ${token} AND expires_at > now() LIMIT 1`) as {
+      sub: string;
+      name: string;
+    }[];
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function pixelStats(): Promise<PixelStats> {
   if (!URL) return { counts: [], recent: [] };
   try {

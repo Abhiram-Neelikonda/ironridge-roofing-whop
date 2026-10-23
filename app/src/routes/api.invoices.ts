@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { whopFetch, accountId, json } from "../lib/whop-api";
+import { adminAuthed } from "../lib/auth";
 import plans from "../config/plans.json";
 
 /**
@@ -28,10 +29,7 @@ export const Route = createFileRoute("/api/invoices")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const adminToken = process.env.ADMIN_TOKEN;
-        if (adminToken && request.headers.get("x-admin-token") !== adminToken) {
-          return json({ error: "Unauthorized." }, 401);
-        }
+        if (!(await adminAuthed(request))) return json({ error: "Unauthorized." }, 401);
 
         let input: InvoiceInput;
         try {

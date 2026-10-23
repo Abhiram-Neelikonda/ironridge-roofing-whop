@@ -21,6 +21,8 @@ export interface SiteConfig {
     tagline: string;
     /** Whop business id (biz_…). Used by Payment Elements (accountId). */
     accountId: string;
+    /** Whop app id (app_…). Used as the OAuth client_id for staff sign-in. */
+    appId: string;
     /** whop.site subdomain this app deploys to. */
     domain: string;
   };
@@ -157,6 +159,8 @@ export const site: SiteConfig = {
     tagline: "Built to protect. Made to last.",
     // Whop business id for this account. Payment Elements use this as accountId.
     accountId: "biz_2KfraYgGWLEV6U",
+    // Whop app id — OAuth client_id for "Sign in with Whop" on /admin.
+    appId: "app_Xyp6dNS6xRxRtw",
     domain: "ironridge-roofing",
   },
 
