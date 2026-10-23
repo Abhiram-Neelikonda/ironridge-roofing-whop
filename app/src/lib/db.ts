@@ -75,3 +75,54 @@ export async function listLeads(limit = 50): Promise<LeadRow[]> {
     return [];
   }
 }
+
+/* ---------------------------- pixel events ---------------------------- */
+
+async function ensurePixelTable() {
+  const sql = client();
+  await sql`CREATE TABLE IF NOT EXISTS pixel_events (
+    id text PRIMARY KEY,
+    event text,
+    props jsonb,
+    created_at timestamptz DEFAULT now()
+  )`;
+}
+
+export async function insertEvent(event: string, props: unknown): Promise<boolean> {
+  if (!URL || !event) return false;
+  try {
+    await ensurePixelTable();
+    const sql = client();
+    const id = globalThis.crypto?.randomUUID?.() ?? `evt_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    await sql`INSERT INTO pixel_events (id, event, props) VALUES (${id}, ${event}, ${JSON.stringify(props ?? {})})`;
+    return true;
+  } catch (err) {
+    console.error("[db] insertEvent failed", (err as Error).message);
+    return false;
+  }
+}
+
+export interface PixelStats {
+  counts: { event: string; count: number }[];
+  recent: { event: string; created_at: string }[];
+}
+
+export async function pixelStats(): Promise<PixelStats> {
+  if (!URL) return { counts: [], recent: [] };
+  try {
+    await ensurePixelTable();
+    const sql = client();
+    const counts = (await sql`SELECT event, count(*)::int AS count FROM pixel_events GROUP BY event ORDER BY count DESC`) as {
+      event: string;
+      count: number;
+    }[];
+    const recent = (await sql`SELECT event, created_at FROM pixel_events ORDER BY created_at DESC LIMIT 12`) as {
+      event: string;
+      created_at: string;
+    }[];
+    return { counts, recent };
+  } catch (err) {
+    console.error("[db] pixelStats failed", (err as Error).message);
+    return { counts: [], recent: [] };
+  }
+}

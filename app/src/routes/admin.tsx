@@ -14,6 +14,23 @@ function Admin() {
   const [token, setToken] = useState("");
   const [tab, setTab] = useState<Tab>("invoices");
 
+  // Remember the admin token on this device so it's not retyped every visit.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ir_admin_token");
+      if (saved) setToken(saved);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      if (token) localStorage.setItem("ir_admin_token", token);
+    } catch {
+      /* ignore */
+    }
+  }, [token]);
+
   return (
     <div className="subpage">
       <header className="header" data-scrolled="true">
@@ -52,7 +69,7 @@ function Admin() {
 
           {tab === "invoices" && <InvoicesTab token={token} />}
           {tab === "leads" && <LeadsTab token={token} />}
-          {tab === "pixels" && <PixelsTab />}
+          {tab === "pixels" && <PixelsTab token={token} />}
         </div>
       </main>
     </div>
@@ -247,6 +264,11 @@ function LeadsTab({ token }: { token: string }) {
     }
   }
 
+  useEffect(() => {
+    if (token) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
@@ -291,37 +313,72 @@ function LeadsTab({ token }: { token: string }) {
 /* ------------------------------- Pixels ------------------------------ */
 
 const EVENTS = [
-  { name: "estimate_requested", when: "Estimate form submitted", custom: true },
-  { name: "service_viewed", when: "A service card scrolls into view", custom: true },
-  { name: "deposit_started", when: "Deposit checkout opens", custom: true },
-  { name: "lead", when: "Estimate form submitted (Whop lead capture)", custom: false },
-  { name: "page view", when: "Every page — automatic", custom: false },
-  { name: "checkout / purchase", when: "Whop checkout — automatic", custom: false },
+  { name: "estimate_requested", when: "Estimate form submitted", custom: true, auto: false },
+  { name: "service_viewed", when: "A service card scrolls into view", custom: true, auto: false },
+  { name: "deposit_started", when: "Deposit checkout opens", custom: true, auto: false },
+  { name: "lead", when: "Estimate form submitted (Whop lead capture)", custom: false, auto: false },
+  { name: "page view", when: "Every page — automatic (Whop)", custom: false, auto: true },
+  { name: "checkout / purchase", when: "Whop checkout — automatic (Whop)", custom: false, auto: true },
 ];
 
-function PixelsTab() {
+function PixelsTab({ token }: { token: string }) {
   const [fired, setFired] = useState(false);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [recent, setRecent] = useState<{ event: string; created_at: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/pixel-stats", { headers: { "x-admin-token": token } });
+      const b = (await res.json()) as { counts?: { event: string; count: number }[]; recent?: { event: string; created_at: string }[] };
+      const map: Record<string, number> = {};
+      (b.counts ?? []).forEach((c) => (map[c.event] = c.count));
+      setCounts(map);
+      setRecent(b.recent ?? []);
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    if (token) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   return (
     <>
-      <h2 style={{ fontSize: "1.25rem" }}>Tracking (Whop Pixel)</h2>
-      <p style={{ color: "var(--color-muted)", fontSize: "0.92rem", margin: "0.3rem 0 1.2rem" }}>
-        Custom events fire through <span className="mono">whop.track</span>. Verify in Dashboard → Pixel, or add{" "}
-        <span className="mono">?debug=1</span> to any page and watch the console.
-      </p>
-      <div className="admin-panel">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+        <div>
+          <h2 style={{ fontSize: "1.25rem" }}>Tracking (Whop Pixel)</h2>
+          <p style={{ color: "var(--color-muted)", fontSize: "0.92rem", marginTop: "0.3rem" }}>
+            Live counts of custom events fired via <span className="mono">whop.track</span>.
+          </p>
+        </div>
+        <button className="btn btn--secondary" onClick={load} type="button">
+          {loading ? "…" : "Refresh"}
+        </button>
+      </div>
+
+      <div className="admin-panel" style={{ marginTop: "1.2rem" }}>
         <div style={{ display: "grid", gap: "0.7rem" }}>
           {EVENTS.map((e) => (
             <div key={e.name} style={{ display: "flex", alignItems: "center", gap: "0.7rem", borderBottom: "1px solid var(--color-border)", paddingBottom: "0.6rem" }}>
-              <span className="mono" style={{ color: e.custom ? "var(--color-accent)" : "var(--color-muted)", minWidth: 180 }}>
+              <span className="mono" style={{ color: e.custom ? "var(--color-accent)" : "var(--color-muted)", minWidth: 170 }}>
                 {e.name}
               </span>
-              <span style={{ fontSize: "0.88rem", color: "var(--color-muted)" }}>{e.when}</span>
-              {e.custom && (
-                <span style={{ marginLeft: "auto", fontSize: "0.7rem", fontWeight: 700, color: "var(--color-copper)" }}>CUSTOM</span>
-              )}
+              <span style={{ fontSize: "0.86rem", color: "var(--color-muted)" }}>{e.when}</span>
+              <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                {e.custom && <span style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--color-copper)" }}>CUSTOM</span>}
+                <span className="mono" style={{ fontWeight: 700, color: "var(--color-primary)", minWidth: 36, textAlign: "right" }}>
+                  {e.auto ? "auto" : (counts[e.name] ?? 0)}
+                </span>
+              </span>
             </div>
           ))}
         </div>
+
         <button
           className="btn btn--secondary"
           style={{ marginTop: "1.2rem" }}
@@ -329,14 +386,31 @@ function PixelsTab() {
           onClick={() => {
             track("admin_test_event", { event_id: `test_${Date.now()}`, source: "staff_console" });
             setFired(true);
+            setTimeout(load, 1400);
           }}
         >
           Fire a test event
         </button>
         {fired && (
           <div className="notice notice--ok" style={{ marginTop: "1rem" }}>
-            Sent <span className="mono">admin_test_event</span> to the Whop Pixel. Open this page with{" "}
-            <span className="mono">?debug=1</span> to see it logged, or check the Pixel dashboard.
+            Sent <span className="mono">admin_test_event</span>. Counts refresh in a moment; also verify in Dashboard → Pixel or with{" "}
+            <span className="mono">?debug=1</span>.
+          </div>
+        )}
+
+        {recent.length > 0 && (
+          <div style={{ marginTop: "1.4rem" }}>
+            <p style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--color-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              Recent events
+            </p>
+            <div style={{ display: "grid", gap: "0.35rem", marginTop: "0.5rem" }}>
+              {recent.map((r, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.84rem" }}>
+                  <span className="mono" style={{ color: "var(--color-accent)" }}>{r.event}</span>
+                  <span style={{ color: "var(--color-muted)" }}>{new Date(r.created_at).toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

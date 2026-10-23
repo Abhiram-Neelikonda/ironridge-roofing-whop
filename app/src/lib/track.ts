@@ -42,6 +42,17 @@ export function track(event: string, props: TrackProps = {}): void {
   } catch (err) {
     if (debugOn()) console.warn("[whop.track] failed", err);
   }
+  // Mirror the event into our DB so /admin can show live counts (fire-and-forget).
+  try {
+    void fetch("/api/track-log", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ event, props: clean }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
   if (debugOn()) {
     // eslint-disable-next-line no-console
     console.log(`%c[whop.track] ${event}`, "color:#315C4C;font-weight:700", clean);
