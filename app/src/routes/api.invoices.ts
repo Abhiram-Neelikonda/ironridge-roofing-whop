@@ -52,7 +52,7 @@ export const Route = createFileRoute("/api/invoices")({
         const base: Record<string, unknown> = {
           account_id: accountId(),
           due_date: dueDate.toISOString(),
-          plan: { initial_price: total, currency: "usd" },
+          plan: { initial_price: total, currency: "usd", plan_type: "one_time" },
           line_items: items.map((l) => ({ label: l.label, unit_price: l.amount, quantity: 1 })),
         };
         if (!plans.productId?.includes("XXXX")) base.product_id = plans.productId;

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { whopFetch, json } from "../lib/whop-api";
+import { whopFetch, json, accountId } from "../lib/whop-api";
 
 interface SetupIntent {
   id: string;
@@ -18,9 +18,10 @@ export const Route = createFileRoute("/api/setup-intents")({
   server: {
     handlers: {
       GET: async () => {
-        const res = await whopFetch<{ data?: SetupIntent[] }>("/setup_intents?per=25", {
-          method: "GET",
-        });
+        const res = await whopFetch<{ data?: SetupIntent[] }>(
+          `/setup_intents?company_id=${accountId()}&per=25`,
+          { method: "GET" },
+        );
         if (!res.ok) {
           return json({ error: res.error ?? "Could not load saved cards.", data: [] }, res.status || 502);
         }

@@ -37,6 +37,9 @@ export async function whopFetch<T = unknown>(
       headers: {
         "content-type": "application/json",
         accept: "application/json",
+        // Pin the API version our request bodies are written against; otherwise
+        // the key defaults to an older version with different params.
+        "Api-Version-Date": "2026-10-15",
         ...(init.headers ?? {}),
       },
     });

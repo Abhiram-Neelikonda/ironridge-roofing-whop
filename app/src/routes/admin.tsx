@@ -29,7 +29,9 @@ function Admin() {
   const [selected, setSelected] = useState<string>("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
-  const [quote, setQuote] = useState<number>(9450);
+  // Default kept under the account's $2,500 purchase cap for demos; raise it on
+  // a verified account with higher limits.
+  const [quote, setQuote] = useState<number>(2200);
   const [applyDeposit, setApplyDeposit] = useState(true);
   const [applyInspection, setApplyInspection] = useState(false);
 
@@ -172,6 +174,9 @@ function Admin() {
               <div className="field">
                 <label htmlFor="quote">Quoted project total (USD)</label>
                 <input id="quote" type="number" min={0} value={quote} onChange={(e) => setQuote(Number(e.target.value))} />
+                <span style={{ fontSize: "0.76rem", color: "var(--color-muted)", marginTop: "0.3rem" }}>
+                  New accounts cap invoices at $2,500; verified accounts support more.
+                </span>
               </div>
               <label className="chip" style={{ marginTop: "1rem", cursor: "pointer" }}>
                 <input type="checkbox" checked={applyDeposit} onChange={(e) => setApplyDeposit(e.target.checked)} />
