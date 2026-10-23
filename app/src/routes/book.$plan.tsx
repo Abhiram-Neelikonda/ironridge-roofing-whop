@@ -7,7 +7,7 @@ import { CheckoutPanel } from "../components/checkout/CheckoutPanel";
 import { SaveCardStep } from "../components/checkout/SaveCardStep";
 import { money } from "../lib/format";
 
-const VALID: PlanKey[] = ["inspection", "deposit", "flatRate"];
+const VALID: PlanKey[] = ["inspection", "deposit", "flatRate", "demo"];
 
 export const Route = createFileRoute("/book/$plan")({
   loader: ({ params }) => {

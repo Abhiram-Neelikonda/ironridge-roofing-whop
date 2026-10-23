@@ -8,6 +8,7 @@ const HREF: Record<PlanKey, string> = {
   inspection: "/book/inspection",
   deposit: "/book/deposit",
   flatRate: "/book/flatRate",
+  demo: "/book/demo",
 };
 
 export function Plans() {

@@ -12,7 +12,7 @@
  */
 
 export type ServiceKey = "inspection" | "replacement" | "repair";
-export type PlanKey = "inspection" | "deposit" | "flatRate";
+export type PlanKey = "inspection" | "deposit" | "flatRate" | "demo";
 
 export interface SiteConfig {
   brand: {
@@ -352,6 +352,25 @@ export const site: SiteConfig = {
       cta: "Book Repair",
       summary:
         "A fixed-price visit to locate and repair a single active leak on most residential roofs, including labor and standard materials. Additional work is quoted and approved before it begins.",
+    },
+    // Hidden $1 plan for testing/recording a live Payment Elements checkout
+    // (Whop's Elements sandbox isn't GA). Not shown on the site; book at /book/demo.
+    // Delete this and its plans.json id for a real client.
+    demo: {
+      eyebrow: "Test Checkout",
+      name: "Demo Checkout",
+      priceCents: USD(1),
+      currency: "usd",
+      cadence: "one-time",
+      features: [
+        "Live Whop Payment Elements",
+        "Apple Pay / Google Pay + card",
+        "Required BrandingElement",
+        "Refundable $1 test charge",
+      ],
+      cta: "Pay $1 (test)",
+      summary:
+        "A $1 live checkout for testing and screen recordings, since Whop's Elements sandbox isn't generally available yet. Refund it afterward in Payments.",
     },
   },
 

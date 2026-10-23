@@ -18,6 +18,7 @@ const PLAN_ID: Record<PlanKey, string> = {
   inspection: plans.inspection,
   deposit: plans.deposit,
   flatRate: plans.flatRate,
+  demo: plans.demo,
 };
 
 // Sandbox is opt-in via env; docs note Elements sandbox is not GA yet, so prod is default.
