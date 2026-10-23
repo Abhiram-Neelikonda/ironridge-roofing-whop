@@ -43,11 +43,14 @@ export async function whopFetch<T = unknown>(
     const text = await res.text();
     const data = text ? safeJson(text) : undefined;
     if (!res.ok) {
+      // Surfaced in `whop apps logs` so a failed call explains itself.
+      console.error(`[whop-api] ${init.method ?? "GET"} ${path} -> ${res.status}: ${text}`);
       return {
         ok: false,
         status: res.status,
         error:
           (data as { message?: string })?.message ??
+          (data as { error?: string })?.error ??
           `Whop API ${res.status}`,
         data: data as T,
       };

@@ -59,7 +59,10 @@ git add -A && git commit -m "IronRidge Roofing — Whop Websites template"
 > financing options surface automatically for eligible buyers. Three real one-time
 > plans drive the high-ticket flow: a **$149 inspection**, a **$500 project deposit**,
 > and a **$399 flat-rate leak repair** (created from a single config file). The
-> "Request an Estimate" form creates **Leads** via the Leads API; after the deposit a
+> "Request an Estimate" form captures leads with the Whop Pixel **`lead`** event
+> (they appear in the dashboard's **Marketing → Leads**) and also posts a Whop
+> **notification** with the full details to the business's team via the server-side
+> API; after the deposit a
 > **setup-mode checkout configuration** saves a card on file (setup intent), and the
 > final balance is billed through the **Invoices API** — auto-charging the stored
 > method or emailing the invoice from the `/admin` page. Three custom **`whop.track`**
@@ -79,8 +82,12 @@ services → plans → process → projects → financing → reviews → estima
 to a phone width to show it's responsive.
 
 **0:30–1:15 — Estimate form → Lead**
-Fill out "Request a Free Estimate", submit, show the success state. Cut to the Whop
-dashboard → **Leads** and show the new lead with its metadata (name, email, service).
+Have two tabs ready: the live site, and the Whop dashboard on **Marketing → Leads**.
+Fill out "Request a Free Estimate" with a recognizable name, submit, and show the
+"Request received" success state. Switch to **Marketing → Leads** and refresh — the
+new lead (name + email) appears. (The pixel takes ~1 min; if it's not there yet, point
+to an earlier submission already in the list, then refresh.) Optionally click the 🔔
+notification bell to show the same lead delivered as a notification with full details.
 
 **1:15–2:20 — Payment Elements checkout**
 Open `/book/deposit`. Show the **ExpressCheckoutElement** (Apple Pay / Google Pay),

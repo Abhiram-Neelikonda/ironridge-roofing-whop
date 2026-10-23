@@ -2,7 +2,7 @@ import { useState } from "react";
 import { site } from "../../config/site";
 import { Icon } from "../ui/Icon";
 import { Picture } from "../ui/Picture";
-import { track } from "../../lib/track";
+import { track, sessionId } from "../../lib/track";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
@@ -27,22 +27,40 @@ export function EstimateForm() {
     if (Object.keys(next).length) return;
 
     setStatus("submitting");
+    const eventId = `lead_${sessionId()}_${Date.now().toString(36)}`;
     try {
-      const res = await fetch("/api/leads", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(data),
+      // Best-effort durable record via the Leads API. It only creates a record
+      // when a Whop user is identified (the API requires user_id); anonymous
+      // visitors are captured by the Pixel lead event below. Never blocks the form.
+      let serverLeadId: string | undefined;
+      try {
+        const res = await fetch("/api/leads", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(data),
+        });
+        if (res.ok) serverLeadId = ((await res.json()) as { id?: string }).id;
+      } catch {
+        /* non-fatal */
+      }
+
+      // Whop Pixel lead capture — the documented way to land form leads on the
+      // account (Pixel + Leads dashboard), plus our custom estimate event.
+      track("lead", {
+        event_id: serverLeadId ?? eventId,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
       });
-      const body = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
-      if (!res.ok) throw new Error(body.error || "Something went wrong. Please call us.");
       track(site.tracking.estimateRequested, {
-        event_id: body.id, // lead id → dedupes retries
+        event_id: serverLeadId ?? eventId,
         service: data.service,
       });
+
       setStatus("success");
       form.reset();
     } catch (err) {
-      setMessage((err as Error).message);
+      setMessage((err as Error).message || "Something went wrong. Please call us.");
       setStatus("error");
     }
   }
