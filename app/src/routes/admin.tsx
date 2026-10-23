@@ -261,10 +261,21 @@ function LeadsTab({ token }: { token: string }) {
         </button>
       </div>
 
+      <div className="notice" style={{ marginTop: "1.2rem" }}>
+        Every estimate request is captured to <strong>Marketing → Leads</strong> in your Whop dashboard
+        (via the pixel) and sent to you as a <strong>notification</strong> (🔔). A website app's key can't
+        read those back into this page, so use the dashboard for the full list.
+        <div style={{ marginTop: "0.9rem" }}>
+          <a className="btn btn--secondary" href="https://whop.com/dashboard" target="_blank" rel="noreferrer">
+            Open Whop dashboard → Marketing → Leads
+          </a>
+        </div>
+      </div>
+
       <div className="admin-panel" style={{ marginTop: "1.2rem" }}>
         {leads.length === 0 ? (
           <p style={{ color: "var(--color-muted)", fontSize: "0.92rem" }}>
-            {note || "Enter your admin token, then Refresh to load recent leads."}
+            {note || "Enter your admin token, then Refresh. (Anonymous website leads live in Marketing → Leads above.)"}
           </p>
         ) : (
           <div style={{ display: "grid", gap: "0.8rem" }}>

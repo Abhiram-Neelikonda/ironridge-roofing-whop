@@ -1,17 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { whopFetch, accountId, json } from "../lib/whop-api";
+import { whopFetch, json } from "../lib/whop-api";
 
-interface Notification {
+interface Lead {
   id: string;
-  subject?: string;
-  content?: string;
   created_at?: string;
+  referrer?: string;
+  metadata?: Record<string, string>;
+  user?: { id?: string; name?: string; email?: string };
 }
 
 /**
- * GET /api/leads-list → recent estimate-request leads, read back from the Whop
- * notifications the form handler posts (subject "New estimate request — …").
- * Used by the Leads tab of /admin. Admin-token protected.
+ * GET /api/leads-list → recent leads from the Whop Leads API. Admin-token
+ * protected. Used by the Leads tab of /admin.
  */
 export const Route = createFileRoute("/api/leads-list")({
   server: {
@@ -22,25 +22,36 @@ export const Route = createFileRoute("/api/leads-list")({
           return json({ error: "Unauthorized.", data: [] }, 401);
         }
 
-        const res = await whopFetch<{ data?: Notification[] }>(
-          `/notifications?account_id=${accountId()}&per=30`,
-          { method: "GET" },
-        );
+        const res = await whopFetch<{ data?: Lead[] }>("/leads?first=30", { method: "GET" });
         if (!res.ok) {
           return json(
-            { data: [], note: "Lead notifications aren't readable here — see Marketing → Leads in your dashboard." },
+            {
+              data: [],
+              note: "Leads aren't listable via the API here — open Marketing → Leads in your Whop dashboard to see them.",
+            },
             200,
           );
         }
-        const leads = (res.data?.data ?? [])
-          .filter((n) => (n.subject ?? "").toLowerCase().startsWith("new estimate request"))
-          .map((n) => ({
-            id: n.id,
-            name: (n.subject ?? "").replace(/^New estimate request —\s*/i, "") || "Lead",
-            details: n.content ?? "",
-            createdAt: n.created_at,
-          }));
-        return json({ data: leads }, 200);
+        const leads = (res.data?.data ?? []).map((l) => {
+          const m = l.metadata ?? {};
+          const details = [
+            m.service && `Service: ${m.service}`,
+            (m.phone || "") && `📞 ${m.phone}`,
+            (l.user?.email || m.email) && `✉️ ${l.user?.email || m.email}`,
+            m.roof_type && `Roof: ${m.roof_type}`,
+            m.timeline && `Timeline: ${m.timeline}`,
+            m.notes && `“${m.notes}”`,
+          ]
+            .filter(Boolean)
+            .join("  ·  ");
+          return {
+            id: l.id,
+            name: l.user?.name || m.name || "Lead",
+            details: details || l.referrer || "",
+            createdAt: l.created_at,
+          };
+        });
+        return json({ data: leads, note: leads.length ? undefined : "No leads via the API yet — your form leads also appear in Marketing → Leads." }, 200);
       },
     },
   },
