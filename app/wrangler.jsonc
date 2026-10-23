@@ -1,0 +1,6 @@
+{
+  "name": "ironridge-roofing-exteriors",
+  "compatibility_date": "2026-10-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry"
+}

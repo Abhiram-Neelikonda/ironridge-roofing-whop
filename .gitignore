@@ -1,0 +1,19 @@
+# dependencies & build output
+node_modules/
+dist/
+.output/
+.nitro/
+.tanstack/
+.wrangler/
+*.tsbuildinfo
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# os / editor
+.DS_Store
+**/.DS_Store
+.claude/
+*.local
