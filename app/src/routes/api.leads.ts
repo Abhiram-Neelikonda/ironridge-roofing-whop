@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { whopFetch, accountId, json } from "../lib/whop-api";
+import { sendThankYou } from "../lib/mail";
 import plans from "../config/plans.json";
 
 /**
@@ -88,7 +89,10 @@ export const Route = createFileRoute("/api/leads")({
           if (res.ok) leadId = res.data?.id ?? res.data?.lead?.id;
         }
 
-        return json({ ok: true, id: leadId, notified: notif.ok }, 200);
+        // 3) Thank-you email to the customer (no-op unless RESEND_API_KEY is set).
+        const emailed = await sendThankYou(form.email, form.name, form.service);
+
+        return json({ ok: true, id: leadId, notified: notif.ok, emailed }, 200);
       },
     },
   },
