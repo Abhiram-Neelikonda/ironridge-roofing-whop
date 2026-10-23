@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { whopFetch, accountId, json } from "../lib/whop-api";
 import { sendThankYou } from "../lib/mail";
+import { insertLead } from "../lib/db";
 import plans from "../config/plans.json";
 
 /**
@@ -89,10 +90,23 @@ export const Route = createFileRoute("/api/leads")({
           if (res.ok) leadId = res.data?.id ?? res.data?.lead?.id;
         }
 
-        // 3) Thank-you email to the customer (no-op unless RESEND_API_KEY is set).
+        // 3) Persist the lead to our database so /admin can list it (the Whop
+        //    app key can't read leads/notifications back).
+        const stored = await insertLead({
+          id: leadId ?? (globalThis.crypto?.randomUUID?.() ?? `lead_${Date.now()}`),
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          service: form.service,
+          roof_type: form.roof_type,
+          timeline: form.timeline,
+          notes: form.notes,
+        });
+
+        // 4) Thank-you email to the customer (no-op unless RESEND_API_KEY is set).
         const emailed = await sendThankYou(form.email, form.name, form.service);
 
-        return json({ ok: true, id: leadId, notified: notif.ok, emailed }, 200);
+        return json({ ok: true, id: leadId, notified: notif.ok, emailed, stored }, 200);
       },
     },
   },
